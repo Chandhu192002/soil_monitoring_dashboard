@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Soil Monitoring Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #42a5f5;
+      --secondary-color: #66bb6a;
+      --background-color: #f0f4f8;
+      --card-bg: #ffffff;
+      --text-color: #333333;
+      --border-color: #e0e0e0;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --alert-color: #f44336;
+      --warning-color: #ff9800;
+      --success-color: #4caf50;
+    }
+
+    [data-theme="dark"] {
+      --primary-color: #2196f3;
+      --secondary-color: #4caf50;
+      --background-color: #121212;
+      --card-bg: #1e1e1e;
+      --text-color: #e0e0e0;
+      --border-color: #333333;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      padding: 1rem;
+      line-height: 1.6;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    h1 {
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .theme-toggle, .btn {
+      background-color: var(--card-bg);
+      color: var(--text-color);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      box-shadow: var(--shadow);
+    }
+
+    .theme-toggle:hover, .btn:hover {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .value-display {
+      font-size: 2.5rem;
+      font-weight: 700;
+      text-align: center;
+      margin: 1.5rem 0;
+      color: var(--primary-color);
+    }
+
+    .moisture .value-display {
+      color: var(--primary-color);
+    }
+
+    .water-level .value-display {
+      color: var(--secondary-color);
+    }
+
+    .chart-container {
+      position: relative;
+      height: 200px;
+      width: 100%;
+    }
+
+    .alerts {
+      grid-column: 1 / -1;
+    }
+
+    .alert-list {
+      list-style: none;
+      margin-top: 1rem;
+    }
+
+    .alert-item {
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .alert-item.warning {
+      background-color: rgba(255, 152, 0, 0.1);
+      border-left: 4px solid var(--warning-color);
+    }
+
+    .alert-item.danger {
+      background-color: rgba(244, 67, 54, 0.1);
+      border-left: 4px solid var(--alert-color);
+    }
+
+    .status-indicator {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1rem;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--success-color);
+    }
+
+    .status-dot.warning {
+      background-color: var(--warning-color);
+    }
+
+    .status-dot.danger {
+      background-color: var(--alert-color);
+    }
+
+    .summary {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .summary-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .summary-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin: 0.5rem 0;
+    }
+
+    .summary-label {
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    footer {
+      margin-top: 2rem;
+      text-align: center;
+      padding: 1rem 0;
+      border-top: 1px solid var(--border-color);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+      
+      header {
+        flex-direction: column;
+        gap: 1rem;
+      }
+      
+      .controls {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><i class="fas fa-seedling"></i> Smart Soil Monitoring Dashboard</h1>
+    <div class="controls">
+      <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon"></i> Dark Mode
+      </button>
+      <button class="btn" id="downloadPdf">
+        <i class="fas fa-file-pdf"></i> Download PDF Report
+      </button>
+      <button class="btn" id="downloadCsv">
+        <i class="fas fa-file-csv"></i> Export CSV Data
+      </button>
+      <button class="btn" id="refreshData">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+  </header>
+
+  <div class="container" id="dashboard-content">
+    <div class="card moisture">
+      <div class="card-header">
+        <div class="card-title">
+          <i class="fas fa-tint"></i> Soil Moisture
+        </div>
+        <div class="status">
+          <div class="status-dot" id="moistureStatus"></div>
+          <span id="moistureStatusText">Good</span>
+        </div>
+      </div>
+      <div class="value-display" id="moistureValue">0%</div>
+      <div class="chart-container">
+        <canvas id="moistureChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card water-level">
+      <div class="card-header">
+        <div class="card-title">
+          <i class="fas fa-water"></i> Water Level
+        </div>
+        <div class="status">
+          <div class="status-dot" id="waterStatus"></div>
+          <span id="waterStatusText">Good</span>
+        </div>
+      </div>
+      <div class="value-display" id="waterValue">0 cm</div>
+      <div class="chart-container">
+        <canvas id="distanceChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card alerts">
+      <div class="card-header">
+        <div class="card-title">
+          <i class="fas fa-bell"></i> Alerts & Notifications
+        </div>
+      </div>
+      <ul class="alert-list" id="alertList">
+        <li class="alert-item">No alerts yet. System is monitoring...</li>
+      </ul>
+    </div>
+
+    <div class="card summary">
+      <div class="card-header">
+        <div class="card-title">
+          <i class="fas fa-chart-bar"></i> Summary
+        </div>
+      </div>
+      <div class="summary">
+        <div class="summary-item">
+          <i class="fas fa-tint fa-2x" style="color: var(--primary-color)"></i>
+          <div class="summary-value" id="avgMoisture">0%</div>
+          <div class="summary-label">Avg Moisture</div>
+        </div>
+        <div class="summary-item">
+          <i class="fas fa-water fa-2x" style="color: var(--secondary-color)"></i>
+          <div class="summary-value" id="avgWaterLevel">0 cm</div>
+          <div class="summary-label">Avg Water Level</div>
+        </div>
+        <div class="summary-item">
+          <i class="fas fa-exclamation-triangle fa-2x" style="color: var(--warning-color)"></i>
+          <div class="summary-value" id="alertCount">0</div>
+          <div class="summary-label">Alerts Today</div>
+        </div>
+        <div class="summary-item">
+          <i class="fas fa-clock fa-2x" style="color: var(--primary-color)"></i>
+          <div class="summary-value" id="lastUpdate">--:--</div>
+          <div class="summary-label">Last Update</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Smart Soil Monitoring System &copy; <span id="currentYear"></span> | Last data update: <span id="lastUpdateTime">--:--</span></p>
+  </footer>
+
+  <script>
+    // Constants
+    const MOISTURE_THRESHOLD = 30;
+    const DISTANCE_THRESHOLD = 10;
+    const API_URL = 'http://192.168.12.109:5500/api/latest-data';
+    const MAX_DATA_POINTS = 20;
+    const UPDATE_INTERVAL = 5000; // 5 seconds
+    
+    // Data storage
+    let moistureData = [];
+    let distanceData = [];
+    let timeLabels = [];
+    let alertsToday = 0;
+    
+    // DOM Elements
+    const moistureValue = document.getElementById('moistureValue');
+    const waterValue = document.getElementById('waterValue');
+    const moistureStatus = document.getElementById('moistureStatus');
+    const moistureStatusText = document.getElementById('moistureStatusText');
+    const waterStatus = document.getElementById('waterStatus');
+    const waterStatusText = document.getElementById('waterStatusText');
+    const alertList = document.getElementById('alertList');
+    const avgMoisture = document.getElementById('avgMoisture');
+    const avgWaterLevel = document.getElementById('avgWaterLevel');
+    const alertCount = document.getElementById('alertCount');
+    const lastUpdate = document.getElementById('lastUpdate');
+    const lastUpdateTime = document.getElementById('lastUpdateTime');
+    const currentYear = document.getElementById('currentYear');
+    const themeToggle = document.getElementById('themeToggle');
+    const downloadPdfBtn = document.getElementById('downloadPdf');
+    const refreshDataBtn = document.getElementById('refreshData');
+    
+    // Set current year
+    currentYear.textContent = new Date().getFullYear();
+    
+    // Initialize charts
+    const moistureChart = createChart('moistureChart', 'Moisture (%)', '#42a5f5');
+    const distanceChart = createChart('distanceChart', 'Water Level (cm)', '#66bb6a');
+    
+    function createChart(elementId, label, color) {
+      const ctx = document.getElementById(elementId).getContext('2d');
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: label,
+            data: [],
+            borderColor: color,
+            backgroundColor: color + '22',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointHoverRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false
+            }
+          },
+          scales: {
+            x: { 
+              display: true,
+              grid: {
+                display: false
+              }
+            },
+            y: { 
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(200, 200, 200, 0.1)'
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // Add data to chart
+    function addData(chart, label, value) {
+      chart.data.labels.push(label);
+      chart.data.datasets[0].data.push(value);
+      
+      if (chart.data.labels.length > MAX_DATA_POINTS) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+      
+      chart.update();
+    }
+    
+    // Update status indicators
+    function updateStatus(moisture, distance) {
+      // Moisture status
+      if (moisture < MOISTURE_THRESHOLD) {
+        moistureStatus.className = 'status-dot danger';
+        moistureStatusText.textContent = 'Low';
+      } else if (moisture < MOISTURE_THRESHOLD + 10) {
+        moistureStatus.className = 'status-dot warning';
+        moistureStatusText.textContent = 'Warning';
+      } else {
+        moistureStatus.className = 'status-dot';
+        moistureStatusText.textContent = 'Good';
+      }
+      
+      // Water level status
+      if (distance > DISTANCE_THRESHOLD) {
+        waterStatus.className = 'status-dot danger';
+        waterStatusText.textContent = 'Low';
+      } else if (distance > DISTANCE_THRESHOLD - 2) {
+        waterStatus.className = 'status-dot warning';
+        waterStatusText.textContent = 'Warning';
+      } else {
+        waterStatus.className = 'status-dot';
+        waterStatusText.textContent = 'Good';
+      }
+    }
+    
+    // Add alert
+    function addAlert(message, type = 'warning') {
+      const now = new Date().toLocaleTimeString();
+      const alertItem = document.createElement('li');
+      alertItem.className = `alert-item ${type}`;
+      alertItem.innerHTML = `
+        <i class="fas fa-exclamation-circle"></i>
+        <span>${now} - ${message}</span>
+      `;
+      
+      // Add to the top of the list
+      if (alertList.firstChild) {
+        alertList.insertBefore(alertItem, alertList.firstChild);
+      } else {
+        alertList.appendChild(alertItem);
+      }
+      
+      // Limit to 5 alerts
+      if (alertList.children.length > 5) {
+        alertList.removeChild(alertList.lastChild);
+      }
+      
+      alertsToday++;
+      alertCount.textContent = alertsToday;
+    }
+    
+    // Update summary
+    function updateSummary() {
+      if (moistureData.length > 0) {
+        const moistureSum = moistureData.reduce((a, b) => a + b, 0);
+        avgMoisture.textContent = Math.round(moistureSum / moistureData.length) + '%';
+      }
+      
+      if (distanceData.length > 0) {
+        const distanceSum = distanceData.reduce((a, b) => a + b, 0);
+        avgWaterLevel.textContent = Math.round(distanceSum / distanceData.length) + ' cm';
+      }
+      
+      const now = new Date().toLocaleTimeString();
+      lastUpdate.textContent = now;
+      lastUpdateTime.textContent = now;
+    }
+    
+    // Fetch data from API
+    async function fetchData() {
+      try {
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        
+        const data = await response.json();
+        const now = new Date().toLocaleTimeString();
+        
+        // Update values
+        const moisture = data.moisture;
+        const distance = data.distance;
+        
+        moistureValue.textContent = moisture + '%';
+        waterValue.textContent = distance + ' cm';
+        
+        // Store data
+        moistureData.push(moisture);
+        distanceData.push(distance);
+        timeLabels.push(now);
+        
+        if (moistureData.length > MAX_DATA_POINTS) {
+          moistureData.shift();
+          distanceData.shift();
+          timeLabels.shift();
+        }
+        
+        // Update charts
+        addData(moistureChart, now, moisture);
+        addData(distanceChart, now, distance);
+        
+        // Update status
+        updateStatus(moisture, distance);
+        
+        // Check for alerts
+        if (moisture < MOISTURE_THRESHOLD) {
+          addAlert(`Soil moisture is low (${moisture}%)`, 'danger');
+        }
+        
+        if (distance > DISTANCE_THRESHOLD) {
+          addAlert(`Water level is low (${distance} cm)`, 'danger');
+        }
+        
+        // Update summary
+        updateSummary();
+        
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        addAlert('Failed to fetch data from the server', 'danger');
+      }
+    }
+    
+    // Generate PDF report
+    async function generatePDF() {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(20);
+    doc.text('Soil Monitoring System Report', 20, 20);
+    
+    // Add date
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30);
+    
+    // Add current values
+    doc.setFontSize(16);
+    doc.text('Current Values', 20, 45);
+    doc.setFontSize(12);
+    doc.text(`Soil Moisture: ${moistureValue.textContent}`, 20, 55);
+    doc.text(`Water Level: ${waterValue.textContent}`, 20, 65);
+    
+    // Add summary
+    doc.setFontSize(16);
+    doc.text('Summary', 20, 80);
+    doc.setFontSize(12);
+    doc.text(`Average Moisture: ${avgMoisture.textContent}`, 20, 90);
+    doc.text(`Average Water Level: ${avgWaterLevel.textContent}`, 20, 100);
+    doc.text(`Alerts Today: ${alertCount.textContent}`, 20, 110);
+    doc.text(`Last Update: ${lastUpdate.textContent}`, 20, 120);
+    
+    // Add alerts
+    doc.setFontSize(16);
+    doc.text('Recent Alerts', 20, 135);
+    doc.setFontSize(12);
+    
+    let yPos = 145;
+    const alerts = Array.from(alertList.children);
+    for (let i = 0; i < Math.min(alerts.length, 5); i++) {
+      const alertText = alerts[i].textContent.trim();
+      doc.text(alertText, 20, yPos);
+      yPos += 10;
+    }
+    
+    // Add charts as images
+    try {
+      // First page with text content is done
+      // Now add charts on new pages
+      
+      // Capture moisture chart
+      const moistureCanvas = document.getElementById('moistureChart');
+      await html2canvas(moistureCanvas).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        doc.addPage();
+        doc.text('Moisture Chart', 20, 20);
+        doc.addImage(imgData, 'PNG', 20, 30, 170, 100);
+      });
+      
+      // Capture water level chart
+      const distanceCanvas = document.getElementById('distanceChart');
+      await html2canvas(distanceCanvas).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        doc.addPage();
+        doc.text('Water Level Chart', 20, 20);
+        doc.addImage(imgData, 'PNG', 20, 30, 170, 100);
+      });
+      
+      // Save the PDF
+      doc.save('soil-monitoring-report.pdf');
+    } catch (error) {
+      console.error('Error capturing charts:', error);
+      // If chart capture fails, still save the PDF with text content
+      doc.save('soil-monitoring-report.pdf');
+    }
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Failed to generate PDF. Please try again.');
+  }
+}
+    
+    // Simple fallback PDF generation without charts
+function generateSimplePDF() {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.setFontSize(20);
+    doc.text('Soil Monitoring System Report', 20, 20);
+    
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30);
+    
+    doc.setFontSize(14);
+    doc.text(`Soil Moisture: ${moistureValue.textContent}`, 20, 50);
+    doc.text(`Water Level: ${waterValue.textContent}`, 20, 60);
+    doc.text(`Average Moisture: ${avgMoisture.textContent}`, 20, 70);
+    doc.text(`Average Water Level: ${avgWaterLevel.textContent}`, 20, 80);
+    doc.text(`Alerts Today: ${alertCount.textContent}`, 20, 90);
+    
+    doc.save('soil-monitoring-report.pdf');
+  } catch (error) {
+    console.error('Error generating simple PDF:', error);
+    alert('Failed to generate PDF. Please check console for errors.');
+  }
+}
+    
+    // Generate and download CSV file
+function exportToCSV() {
+  try {
+    // Create CSV headers
+    let csvContent = "Time,Moisture (%),Water Level (cm)\n";
+    
+    // Add data rows
+    for (let i = 0; i < timeLabels.length; i++) {
+      csvContent += `${timeLabels[i]},${moistureData[i]},${distanceData[i]}\n`;
+    }
+    
+    // Create a Blob with the CSV content
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create a link element to trigger the download
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `soil-monitoring-data-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.display = 'none';
+    
+    // Add to document, trigger click and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the URL object
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+  } catch (error) {
+    console.error('Error exporting CSV:', error);
+    alert('Failed to export CSV. Please try again.');
+  }
+}
+    
+    // Theme toggle
+    function toggleTheme() {
+      const body = document.body;
+      const isDark = body.getAttribute('data-theme') === 'dark';
+      
+      if (isDark) {
+        body.removeAttribute('data-theme');
+        themeToggle.innerHTML = '<i class="fas fa-moon"></i> Dark Mode';
+      } else {
+        body.setAttribute('data-theme', 'dark');
+        themeToggle.innerHTML = '<i class="fas fa-sun"></i> Light Mode';
+      }
+    }
+    
+    // Event listeners
+    themeToggle.addEventListener('click', toggleTheme);
+downloadPdfBtn.addEventListener('click', function() {
+  try {
+    generatePDF();
+  } catch (error) {
+    console.error('Primary PDF generation failed, trying fallback:', error);
+    generateSimplePDF();
+  }
+});
+document.getElementById('downloadCsv').addEventListener('click', exportToCSV);
+refreshDataBtn.addEventListener('click', fetchData);
+    
+    // Initialize
+    fetchData();
+    
+    // Set interval for data updates
+    setInterval(fetchData, UPDATE_INTERVAL);
+    
+    // Mock data for testing (comment out in production)
+    function mockData() {
+      const mockMoisture = Math.floor(Math.random() * 100);
+      const mockDistance = Math.floor(Math.random() * 20);
+      
+      const mockResponse = {
+        moisture: mockMoisture,
+        distance: mockDistance
+      };
+      
+      // Update values
+      moistureValue.textContent = mockMoisture + '%';
+      waterValue.textContent = mockDistance + ' cm';
+      
+      const now = new Date().toLocaleTimeString();
+      
+      // Store data
+      moistureData.push(mockMoisture);
+      distanceData.push(mockDistance);
+      timeLabels.push(now);
+      
+      if (moistureData.length > MAX_DATA_POINTS) {
+        moistureData.shift();
+        distanceData.shift();
+        timeLabels.shift();
+      }
+      
+      // Update charts
+      addData(moistureChart, now, mockMoisture);
+      addData(distanceChart, now, mockDistance);
+      
+      // Update status
+      updateStatus(mockMoisture, mockDistance);
+      
+      // Check for alerts
+      if (mockMoisture < MOISTURE_THRESHOLD) {
+        addAlert(`Soil moisture is low (${mockMoisture}%)`, 'danger');
+      }
+      
+      if (mockDistance > DISTANCE_THRESHOLD) {
+        addAlert(`Water level is low (${mockDistance} cm)`, 'danger');
+      }
+      
+      // Update summary
+      updateSummary();
+    }
+    
+    // Uncomment to use mock data instead of API
+    // setInterval(mockData, UPDATE_INTERVAL);
+    // mockData();
+  </script>
+</body>
+</html>
